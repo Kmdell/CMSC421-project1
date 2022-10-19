@@ -13,8 +13,10 @@
 #define SUCC "Hello from Server\0"
 
 void likeServerLog(int id, char *log) {
+    // create filepath dependent on the id
     char filePath[20];
     sprintf(filePath, "/tmp/LikeServer%d", id);
+    // open the file path and if fail exit with return code 1
     FILE *filePtr = NULL;
     filePtr = fopen(filePath, "a");
     if (filePtr == NULL) {
@@ -65,6 +67,9 @@ int likeServerSend(int likes, int id) {
 }
 
 void likeServer(int id){
+    // sleep for a little bit waiting for the primary server to wake up
+    int wake = 10 - id;
+    sleep(wake);
     srand(time(NULL) + id);
     int likes = rand() % 42;
     int sleepTime = (rand() % 4) + 1;
@@ -72,7 +77,7 @@ void likeServer(int id){
     time(&start_t);
     time(&end_t);
     // run the server until it hits 5 minutes
-    while (difftime(end_t, start_t) <= 30) {
+    while (difftime(end_t, start_t) <= 300 - wake) {
         #ifdef DEBUG
         printf("Random sleep time: %d\n", sleepTime);
         printf("Hello from the LikeServer%d: The Random Number generated was %d\n", id, likes);
@@ -80,9 +85,13 @@ void likeServer(int id){
         sleep(sleepTime);
         if (likeServerSend(likes, id) > 0) {
             likes = 0;
-            likeServerLog(id, "Successfully sent likes to Primary Server");
+            char msg[46];
+            sprintf(msg, "Successfully sent %02d likes to Primary Server\0", likes);
+            likeServerLog(id, msg);
         } else {
-            likeServerLog(id, "Failed to send likes to Primary Server");
+            char msg[43];
+            sprintf(msg, "Failed to send %02d likes to Primary Server\0", likes);
+            likeServerLog(id, msg);
         }
         time(&end_t);
     }
@@ -123,7 +132,9 @@ int validate(char *msg) {
 }
 
 int extractValue(char *msg) {
-    return 1;
+    int value = atoi(msg+12);
+    printf("%d\n", value);
+    return value;
 }
 
 void primaryLikeServer() {
@@ -175,7 +186,7 @@ void primaryLikeServer() {
         exit(1);
     }
 
-    while (difftime(end_t, start_t) <= 40) {
+    while (difftime(end_t, start_t) <= 340) {
         char buffer[1024] = { 0 };
         // accept the connection and keep the socket info for the client to send a response, has a timeout set for 10 seconds
         cfd = accept(sfd, (struct sockaddr*) &address, (socklen_t*)&server_info_len);
@@ -204,6 +215,7 @@ void primaryLikeServer() {
         #ifdef DEBUG
         printf("Server Received message: %s\n", buffer);
         #endif
+        // send the success string to alert the Like server that the likes were received
         send(cfd, SUCC, strlen(SUCC), 0);
         close(cfd);   
         time(&end_t);      
@@ -287,7 +299,6 @@ int main(int argc, char **argv) {
             pid_t tempPid = waitpid(pid[ii], &stat, 0);
             if (WIFEXITED(stat)) {
                 int exit = WEXITSTATUS(stat);
-                printf("Exit status: %d\n", exit);
                 #ifdef DEBUG
                 printf("LikeServer%d terminated with status: %d\n", ii, exit);
                 #endif

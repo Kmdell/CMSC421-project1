@@ -1,15 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/prctl.h>
 
-#define DEBUG 1
 #define PORT 9756
 #define SUCC "Successfully received a number from Client\0"
 #define FAIL "Failed to receive a valid number from Client\0"
@@ -30,17 +23,15 @@ int main(int argc, char **argv) {
             }
             #endif
             if (ii < 10) {
-                char name[18];
-                sprintf(name, "./LikeServer0 %d\0", ii);
-                printf("%s", name);
-                printf("%s", name);
-                if (execlp("./LikeServer0\0", name, NULL) < 0) {
-                    perror("Error loading the binary into the process");
+                char id[1];
+                sprintf(id, "%d", ii);
+                if (execlp("./LikeServer", "./LikeServer", id, NULL) < 0) {
+                    perror("Error executing a LikeServer binary in the process");
                     exit(1);
                 }
             } else {
                 if (execlp("./PrimaryLikesServer", "PrimaryLikesServer", NULL) < 0) {
-                    perror("Error loading the binary into the process");
+                    perror("Error executing the Primary Likes Server binary in the process");
                     exit(1);
                 }
             }

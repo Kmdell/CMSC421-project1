@@ -7,7 +7,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#define DEBUG 0
 #define PORT 9756
 #define SUCC "Successfully received a number from Client\0"
 #define FAIL "Failed to receive a valid number from Client\0"

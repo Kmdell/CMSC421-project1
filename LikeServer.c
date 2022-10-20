@@ -8,8 +8,6 @@
 #include <sys/socket.h>
 #include <sys/prctl.h>
 
-
-#define DEBUG 0
 #define PORT 9756
 #define SUCC "Successfully received a number from Client\0"
 #define FAIL "Failed to receive a valid number from Client\0"
@@ -77,6 +75,10 @@ void main(int argc, char **argv) {
     printf("Hello from like server");
     #endif
     int id = atoi(argv[1]);
+    char name[16];
+    sprintf(name, "LikeServer%d", id);
+    strncpy(argv[0], name, strlen(argv[0]));
+    prctl(PR_SET_NAME, name);
     // sleep for a little bit waiting for the primary server to wake up
     int wake = 10 - id;
     srand(time(NULL));

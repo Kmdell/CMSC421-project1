@@ -10,7 +10,8 @@
 #include <sys/prctl.h>
 
 #define PORT 9756
-#define SUCC "Hello from Server\0"
+#define SUCC "Successfully received a number from Client\0"
+#define FAIL "Failed to receive a valid number from Client\0"
 
 void likeServerLog(int id, char *log) {
     // create filepath dependent on the id
@@ -41,21 +42,25 @@ int likeServerSend(int likes, int id) {
     address.sin_port = htons(PORT);
     socklen_t server_info_len = sizeof(address);
 
+    // create a socket
     if ((sfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket Creation Failed");
         exit(1);
     }
 
+    //create a connection to the server
     if ((cfd = connect(sfd, (struct sockaddr*)&address, server_info_len)) < 0) {
         perror("Connection to Server Failed");
         return -1;
     }
 
+    // send the message
     send(sfd, msg, strlen(msg), 0);
     #ifdef DEBUG
     printf("Sent the message: %s", msg);
     #endif
     valread = read(sfd, buffer, 1024);
+    // make sure the response is the same as the success message
     if (strcmp(buffer, SUCC) < 0) {
         return -1;
     } else {
@@ -69,9 +74,14 @@ int likeServerSend(int likes, int id) {
 void likeServer(int id){
     // sleep for a little bit waiting for the primary server to wake up
     int wake = 10 - id;
+    srand(time(NULL));
     sleep(wake);
-    srand(time(NULL) + id);
     int likes = rand() % 42;
+    #ifdef DEBUG
+    if (likes == 0) {
+        printf("%d\n", likes);
+    }
+    #endif
     int sleepTime = (rand() % 4) + 1;
     time_t start_t, end_t;
     time(&start_t);
@@ -83,12 +93,14 @@ void likeServer(int id){
         printf("Hello from the LikeServer%d: The Random Number generated was %d\n", id, likes);
         #endif
         sleep(sleepTime);
+        // if the like server send is positive then print to log file
         if (likeServerSend(likes, id) > 0) {
-            likes = 0;
             char msg[46];
             sprintf(msg, "Successfully sent %02d likes to Primary Server\0", likes);
             likeServerLog(id, msg);
+            likes = 0;
         } else {
+            // print that the message failed
             char msg[43];
             sprintf(msg, "Failed to send %02d likes to Primary Server\0", likes);
             likeServerLog(id, msg);
@@ -132,9 +144,8 @@ int validate(char *msg) {
 }
 
 int extractValue(char *msg) {
-    int value = atoi(msg+12);
-    printf("%d\n", value);
-    return value;
+    //extract value after 12 characters
+    return atoi(msg+12);
 }
 
 void primaryLikeServer() {
@@ -164,6 +175,7 @@ void primaryLikeServer() {
         exit(1);
     }
 
+    // set socket options
     if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
         perror("Set Socket Error");
         exit(1);
@@ -196,13 +208,22 @@ void primaryLikeServer() {
         if (validate(buffer) > 0) {
             int likes = 0;
             likes = extractValue(buffer);
+            #ifdef DEBUG
+            if (likes) {
+                printf("%d\n", likes);
+            }
+            #endif
             sum += likes;
+            #ifdef DEBUG
             printf("%d\n", sum);
+            #endif
             // print out the total and the amount received
             FILE *filePtr = NULL;
             filePtr = fopen("/tmp/PrimaryLikesLog", "a");
             if (filePtr == NULL) {
+                #ifdef DEBUG
                 printf("Something went horribly wrong trying to open the log file\n");
+                #endif
                 perror("Error Opening Primary Process Log File");
                 exit(1);
             } else {\
@@ -210,13 +231,16 @@ void primaryLikeServer() {
                 fprintf(filePtr, "Total %d\n", sum);
                 fclose(filePtr);
             }
+            // send the success string to alert the Like server that the likes were received
+            send(cfd, SUCC, strlen(SUCC), 0);
+        } else {
+            // sends the fail message if the message is not valid
+            send(cfd, FAIL, strlen(FAIL), 0);
         }
 
         #ifdef DEBUG
         printf("Server Received message: %s\n", buffer);
         #endif
-        // send the success string to alert the Like server that the likes were received
-        send(cfd, SUCC, strlen(SUCC), 0);
         close(cfd);   
         time(&end_t);      
     }
